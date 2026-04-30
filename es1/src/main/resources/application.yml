@@ -1,0 +1,81 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  task:
+    execution:
+      thread-name-prefix: async-task-
+      pool:
+        core-size: 2
+        max-size: 5
+        queue-capacity: 1000
+
+  profiles:
+    active: dev
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB
+      max-request-size: 100MB
+      location: F:/esdata/temp
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/essql?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+
+  elasticsearch:
+    uris: http://localhost:9200
+    username: elastic
+    password: 123456
+    connection-timeout: 5000
+    socket-timeout: 60000
+
+# 文件存储配置
+file:
+  storage:
+    base-path: F:/esdata/docs
+
+# Knife4j配置
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+jwt:
+  secret: es-search-key-2026-springboot-3x-very-long-secret-key-for-security
+  expiration: 2592000000
+
+admin:
+  username: admin
+  password: admin123
+
+logging:
+  level:
+    com.example.es1.common.aspect: DEBUG
+    com.example.es1.service.LogBatchService: DEBUG
