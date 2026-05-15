@@ -102,9 +102,6 @@ public class HighlightUtil {
         if (end < text.length()) {
             previewText = previewText + "...";
         }
-        if (start > 0) {
-            previewText = "..." + previewText;
-        }
 
         List<KeywordHighlightVO.KeywordPosition> adjustedPositions = new ArrayList<>();
         for (KeywordHighlightVO.KeywordPosition pos : allPositions) {

@@ -6,14 +6,25 @@ import com.example.es1.common.result.Result;
 import com.example.es1.dto.DocumentSearchDTO;
 import com.example.es1.dto.DocumentUploadDTO;
 import com.example.es1.dto.SearchHitVO;
-import com.example.es1.entity.nfDocument;
+import com.example.es1.entity.Document;
+import com.example.es1.repository.jpa.DocumentJpaRepository;
 import com.example.es1.service.DocumentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Tag(name = "文档管理",description = "文档上传、搜索、详情接口")
 @RestController
@@ -22,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final DocumentJpaRepository documentJpaRepository;
 
     @Operation(summary = "上传文档")
     @Log(operation = "upload")
@@ -48,9 +60,9 @@ public class DocumentController {
     @Operation(summary = "获取文档详情")
     @Log(operation = "view", docIdParam = "docId")
     @GetMapping("/detail/{docId}")
-    public Result<nfDocument> detail(@PathVariable String docId) {
-        nfDocument nfDocument = documentService.getDetail(docId);
-        return Result.success(nfDocument);
+    public Result<Document> detail(@PathVariable String docId, HttpServletRequest request) {
+        Document Document = documentService.getDetail(docId, request);
+        return Result.success(Document);
     }
 
     @Operation(summary = "删除文档")
@@ -59,5 +71,34 @@ public class DocumentController {
     public Result<Void> delete(@PathVariable String docId) {
         documentService.delete(docId);
         return Result.success();
+    }
+
+    @Operation(summary = "后台管理-获取所有文档列表")
+    @GetMapping("/admin/documents")
+    public Result<PageResult<Document>> listAllDocuments(
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "20") Integer pageSize,
+            @RequestParam(required = false) String fileType,
+            @RequestParam(required = false) String keyword) {
+
+        Pageable pageable = PageRequest.of(pageNum - 1, pageSize, Sort.by(Sort.Direction.DESC, "uploadTime"));
+        Page<Document> page;
+
+        Specification<Document> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (StringUtils.hasText(fileType)) {
+                predicates.add(cb.equal(root.get("fileType"), fileType));
+            }
+
+            if (StringUtils.hasText(keyword)) {
+                predicates.add(cb.like(root.get("fileName"), "%" + keyword + "%"));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        page = documentJpaRepository.findAll(spec, pageable);
+
+        return Result.success(PageResult.of(page.getTotalElements(), page.getContent(), pageNum, pageSize));
     }
 }

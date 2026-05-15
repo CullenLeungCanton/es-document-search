@@ -1,8 +1,0 @@
-logging:
-  level:
-    com.planning: DEBUG
-    org.springframework: INFO
-
-file:
-  storage:
-    base-path: F:/esdata/docs

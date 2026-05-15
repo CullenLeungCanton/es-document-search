@@ -3,10 +3,11 @@ package com.example.es1.controller;
 import cn.hutool.core.io.FileUtil;
 import com.example.es1.common.annotation.Log;
 import com.example.es1.common.exception.BusinessException;
-import com.example.es1.entity.nfDocument;
+import com.example.es1.entity.Document;
 import com.example.es1.service.DocumentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -31,10 +32,10 @@ public class FileController {
     @Operation(summary = "预览文件（在线查看）")
     @Log(operation = "preview", docIdParam = "docId")
     @GetMapping("/preview/{docId}")
-    public ResponseEntity<Resource> preview(@PathVariable String docId) {
-        nfDocument nfDocument = documentService.getDetail(docId);
-        String filePath = nfDocument.getFilePath();
-        String fileName = nfDocument.getFileName();
+    public ResponseEntity<Resource> preview(@PathVariable String docId, HttpServletRequest request) {
+        Document Document = documentService.getDetail(docId, request);
+        String filePath = Document.getFilePath();
+        String fileName = Document.getFileName();
 
         File file = new File(filePath);
         if (!file.exists()) {
@@ -50,10 +51,10 @@ public class FileController {
     @Operation(summary = "下载文件")
     @Log(operation = "download", docIdParam = "docId")
     @GetMapping("/download/{docId}")
-    public ResponseEntity<Resource> download(@PathVariable String docId) {
-        nfDocument nfDocument = documentService.getDetail(docId);
-        String filePath = nfDocument.getFilePath();
-        String fileName = nfDocument.getFileName();
+    public ResponseEntity<Resource> download(@PathVariable String docId, HttpServletRequest request) {
+        Document Document = documentService.getDetail(docId, request);
+        String filePath = Document.getFilePath();
+        String fileName = Document.getFileName();
 
         File file = new File(filePath);
         if (!file.exists()) {

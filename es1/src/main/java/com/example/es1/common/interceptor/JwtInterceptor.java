@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 @Slf4j
@@ -19,6 +20,16 @@ public class JwtInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
+        if (!(handler instanceof HandlerMethod)) {
+            return true;
+        }
+
+        HandlerMethod handlerMethod = (HandlerMethod) handler;
+
+        if (isPublicPath(request.getRequestURI())) {
             return true;
         }
 
@@ -41,6 +52,21 @@ public class JwtInterceptor implements HandlerInterceptor {
         request.setAttribute("username", username);
         request.setAttribute("role", role);
 
+        if (isAdminPath(request.getRequestURI())) {
+            if (!"admin".equals(role)) {
+                throw new BusinessException(403, "权限不足，需要管理员权限");
+            }
+        }
+
         return true;
     }
+
+    private boolean isPublicPath(String uri) {
+        return uri.startsWith("api/auth/login") || uri.startsWith("api/auth/register") || uri.startsWith("/doc.html") || uri.startsWith("/swagger-ui") || uri.startsWith("/v3/api-docs") || uri.startsWith("/webjars");
+    }
+
+    private boolean isAdminPath(String uri) {
+        return uri.startsWith("/api/admin") || uri.startsWith("/api/documents/admin") || uri.startsWith("/api/audit");
+    }
+
 }

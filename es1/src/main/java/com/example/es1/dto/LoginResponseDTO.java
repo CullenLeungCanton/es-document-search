@@ -28,4 +28,10 @@ public class LoginResponseDTO {
 
     @Schema(description = "角色")
     private String role;
+
+    @Schema(description = "头像")
+    private String avatar;
+
+    @Schema(description = "部门")
+    private String department;
 }

@@ -1,17 +1,17 @@
 package com.example.es1.repository.es;
 
-import com.example.es1.entity.nfDocument;
+import com.example.es1.entity.Document;
 import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 @Repository
-public interface DocumentEsRepository extends ElasticsearchRepository<nfDocument, String> {
+public interface DocumentEsRepository extends ElasticsearchRepository<Document, String> {
 
-    Optional<nfDocument> findByDocId(String docId);
+    Optional<Document> findByDocId(String docId);
 
-    List<nfDocument> findByDocIdIn(List<String> docIds);
+    List<Document> findByDocIdIn(List<String> docIds);
 
     void deleteByDocId(String docId);
 }

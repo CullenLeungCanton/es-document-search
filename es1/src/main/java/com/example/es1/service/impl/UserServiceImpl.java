@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import com.example.es1.common.exception.BusinessException;
 import com.example.es1.common.result.PageResult;
 import com.example.es1.common.utils.JwtUtil;
+import com.example.es1.common.utils.UserContextUtil;
 import com.example.es1.dto.*;
 import com.example.es1.entity.User;
 import com.example.es1.repository.jpa.UserRepository;
@@ -39,7 +40,7 @@ public class UserServiceImpl implements UserService {
 
         User user = new User();
         user.setUsername(dto.getUsername());
-        user.setPassword(dto.getPassword());
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
         user.setRealName(dto.getRealName());
         user.setDepartment(dto.getDepartment());
         user.setRole("user");
@@ -77,7 +78,9 @@ public class UserServiceImpl implements UserService {
                 user.getId(),
                 user.getUsername(),
                 user.getRealName(),
-                user.getRole()
+                user.getRole(),
+                user.getAvatar(),
+                user.getDepartment()
         );
     }
 
@@ -148,14 +151,19 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void updateUserStatus(Integer userId, Integer status) {
+        Integer currentUserId = UserContextUtil.getCurrentUserId();
         if (status != 0 && status != 1) {
             throw new BusinessException("状态值只能是0或1");
         }
 
         User user = userRepository.findById(userId).orElseThrow(() -> new BusinessException("用户不存在"));
 
-        if (status == 0 && userId.equals(user.getId())) {
+        if (status == 0 && userId.equals(currentUserId)) {
             throw new BusinessException("不能禁用当前登录账号");
+        }
+
+        if (status == 0 && user.getRole().equals("admin") && user.getId() == 1) {
+            throw new BusinessException("超级管理员不能被禁用");
         }
 
         user.setStatus(status);

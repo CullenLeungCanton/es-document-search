@@ -11,23 +11,24 @@ import com.example.es1.common.result.PageResult;
 import com.example.es1.common.utils.HighlightUtil;
 import com.example.es1.common.utils.JwtUtil;
 import com.example.es1.dto.*;
-import com.example.es1.entity.nfDocument;
+import com.example.es1.entity.DocViewRecord;
+import com.example.es1.entity.Document;
 import com.example.es1.repository.es.DocumentEsRepository;
+import com.example.es1.repository.jpa.DocViewRecordRepository;
 import com.example.es1.repository.jpa.DocumentJpaRepository;
 import com.example.es1.service.DocumentService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.client.elc.ElasticsearchTemplate;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.query.HighlightQuery;
-import org.springframework.data.elasticsearch.core.query.StringQuery;
 import org.springframework.data.elasticsearch.core.query.highlight.Highlight;
 import org.springframework.data.elasticsearch.core.query.highlight.HighlightField;
 import org.springframework.data.elasticsearch.core.query.highlight.HighlightFieldParameters;
@@ -36,13 +37,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
-import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -51,6 +50,7 @@ public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentJpaRepository documentJpaRepository;
     private final DocumentEsRepository documentEsRepository;
+    private final DocViewRecordRepository docViewRecordRepository;
     private final ElasticsearchTemplate elasticsearchTemplate;
     private final TextExtractService textExtractService;
     private final HighlightUtil highlightUtil;
@@ -65,6 +65,7 @@ public class DocumentServiceImpl implements DocumentService {
         String keyword = dto.getKeyword();
         String category = dto.getCategory();
         String region = dto.getRegion();
+        String sortBy = dto.getSortBy();
         int pageNum = dto.getPageNum() - 1;
         int pageSize = dto.getPageSize();
 
@@ -85,19 +86,33 @@ public class DocumentServiceImpl implements DocumentService {
             boolBuilder.filter(Query.of(q -> q.term(t -> t.field("region").value(region))));
         }
 
+        Sort.Order sortOrder;
+
+        switch (sortBy) {
+            case "latest":
+                sortOrder = Sort.Order.desc("uploadTime");
+                break;
+            case "views":
+                sortOrder = Sort.Order.desc("viewCount");
+            case "relevance":
+            default:
+                sortOrder = Sort.Order.desc("_score");
+                break;
+        }
+
         Highlight hl = new Highlight(List.of(new HighlightField("content", HighlightFieldParameters.builder().withPreTags("<em class='highlight'>").withPostTags("</em>").withFragmentSize(150).withNumberOfFragments(2).build())));
 
         HighlightQuery highlightQuery = new HighlightQuery(hl, null);
 
-        NativeQuery nativeQuery = NativeQuery.builder().withQuery(boolBuilder.build()._toQuery()).withPageable(PageRequest.of(pageNum, pageSize)).withHighlightQuery(highlightQuery).build();
+        NativeQuery nativeQuery = NativeQuery.builder().withQuery(boolBuilder.build()._toQuery()).withPageable(PageRequest.of(pageNum, pageSize, Sort.by(sortOrder))).withHighlightQuery(highlightQuery).build();
 
-        SearchHits<nfDocument> searchHits = elasticsearchOperations.search(nativeQuery, nfDocument.class);
+        SearchHits<Document> searchHits = elasticsearchOperations.search(nativeQuery, Document.class);
 
         long total = searchHits.getTotalHits();
 
         List<SearchHitVO> records = new ArrayList<>();
-        for (SearchHit<nfDocument> hit : searchHits) {
-            nfDocument doc = hit.getContent();
+        for (SearchHit<Document> hit : searchHits) {
+            Document doc = hit.getContent();
             SearchHitVO hitVO = new SearchHitVO();
             BeanUtil.copyProperties(doc, hitVO);
 
@@ -139,24 +154,24 @@ public class DocumentServiceImpl implements DocumentService {
             String content = textExtractService.extractFromBytes(fileBytes, originalFilename);
             String filePath = saveFileToDisk(fileBytes, originalFilename, docId);
 
-            nfDocument nfDocument = new nfDocument();
-            nfDocument.setDocId(docId);
-            nfDocument.setFileName(file.getOriginalFilename());
-            nfDocument.setFileType(getFileType(originalFilename));
-            nfDocument.setFileSize(file.getSize());
-            nfDocument.setFilePath(filePath);
-            nfDocument.setCategory(dto.getCategory());
-            nfDocument.setRegion(dto.getRegion());
-            nfDocument.setTags(dto.getTags());
-            nfDocument.setUploadTime(LocalDateTime.now());
-            nfDocument.setUploadUser(dto.getUploadUser());
-            nfDocument.setContent(content);
-            nfDocument.setViewCount(0);
-            nfDocument.setDownloadCount(0);
+            Document Document = new Document();
+            Document.setDocId(docId);
+            Document.setFileName(file.getOriginalFilename());
+            Document.setFileType(getFileType(originalFilename));
+            Document.setFileSize(file.getSize());
+            Document.setFilePath(filePath);
+            Document.setCategory(dto.getCategory());
+            Document.setRegion(dto.getRegion());
+            Document.setTags(dto.getTags());
+            Document.setUploadTime(LocalDateTime.now());
+            Document.setUploadUser(dto.getUploadUser());
+            Document.setContent(content);
+            Document.setViewCount(0);
+            Document.setDownloadCount(0);
 
-            documentJpaRepository.save(nfDocument);
+            documentJpaRepository.save(Document);
 
-            documentEsRepository.save(nfDocument);
+            documentEsRepository.save(Document);
 
             log.info("文档上传成功：docId={}, fileName={}", docId, file.getOriginalFilename());
             return docId;
@@ -167,21 +182,16 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    public nfDocument getDetail(String docId) {
-        nfDocument nfDocument = documentJpaRepository.findByDocId(docId).orElseThrow(() -> new BusinessException("文档不存在"));
-
-        nfDocument.setViewCount(nfDocument.getViewCount() + 1);
-        documentJpaRepository.save(nfDocument);
-
-        return nfDocument;
+    public Document getDetail(String docId, HttpServletRequest request) {
+        return incrementViewCountIfNeeded(docId, request);
     }
 
     @Override
     @Transactional
     public void delete(String docId) {
-        nfDocument nfDocument = documentJpaRepository.findByDocId(docId).orElseThrow(() -> new BusinessException("文档不存在"));
+        Document Document = documentJpaRepository.findByDocId(docId).orElseThrow(() -> new BusinessException("文档不存在"));
 
-        File file = new File(nfDocument.getFilePath());
+        File file = new File(Document.getFilePath());
         if (file.exists()) {
             file.delete();
         }
@@ -234,5 +244,43 @@ public class DocumentServiceImpl implements DocumentService {
             case "xlsx": return "excel";
             default: return "other";
         }
+    }
+
+    private Document incrementViewCountIfNeeded(String docId, HttpServletRequest request) {
+        Document Document = documentJpaRepository.findByDocId(docId).orElseThrow(() -> new BusinessException("文档不存在"));
+
+        Integer userId = (Integer) request.getAttribute("userId");
+
+        if (userId != null) {
+            LocalDate today = LocalDate.now();
+
+            boolean alreadyRecorded = docViewRecordRepository.existsByDocIdAndUserIdAndViewDate(docId, userId, today);
+
+            if (!alreadyRecorded) {
+                Document.setViewCount(Document.getViewCount() + 1);
+                documentJpaRepository.save(Document);
+
+                DocViewRecord record = new DocViewRecord();
+                record.setDocId(docId);
+                record.setUserId(userId);
+                record.setViewDate(today);
+                record.setCreateTime(LocalDateTime.now());
+                docViewRecordRepository.save(record);
+            }
+        }
+
+//        HttpSession session = request.getSession();
+//        String viewedKey = "viewed_doc_" + docId;
+//
+//        if (session.getAttribute(viewedKey) == null) {
+//            nfDocument.setViewCount(nfDocument.getViewCount() + 1);
+//            documentJpaRepository.save(nfDocument);
+//            session.setAttribute(viewedKey, true);
+//            log.debug("文档 {} 浏览量 +1，当前浏览量： {}", docId, nfDocument.getViewCount());
+//        } else {
+//            log.debug("文档 {} 本次会话已查看过，不重复计数", docId);
+//        }
+
+        return Document;
     }
 }

@@ -21,4 +21,7 @@ public class DocumentSearchDTO {
 
     @Schema(description = "每页大小", defaultValue = "20")
     private Integer pageSize = 20;
+
+    @Schema(description = "排序类型: relevance/latest/views", defaultValue = "relevance", allowableValues = {"relevance", "latest", "views"})
+    private String sortBy = "relevance";
 }
